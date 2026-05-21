@@ -540,6 +540,7 @@
         <div class="actions">
           <button id="reset">重置</button>
           <button id="copy">复制</button>
+          <button id="restore">恢复</button>
         </div>
         <p style="margin-top: 10px;">相关细节说明，请参考ArgoSBX小钢炮脚本项目💣：<a href="https://github.com/yonggekkk/argosbx" target="_blank">github.com/yonggekkk/argosbx</a></p>
 1、ArgoSBX一键SSH命令生成器发布，只要点几下，各大代理协议任你选：<a href="https://youtu.be/4u6W4c-t3oU" target="_blank">点击视频教程</a></p>
@@ -839,6 +840,78 @@
       }
     });
   });
+
+  function restoreFromOutput() {
+    const text = output.value.trim();
+    if (!text) { showToast('命令文本框为空'); return; }
+
+    // Strip the bash command part, keep only variable assignments
+    const cmdIdx = text.indexOf('bash <(');
+    const varPart = cmdIdx > 0 ? text.substring(0, cmdIdx).trim() : text;
+
+    // Parse key="value" pairs
+    const parsed = {};
+    const re = /(\w+)="([^"]*)"/g;
+    let m;
+    while ((m = re.exec(varPart)) !== null) {
+      parsed[m[1]] = m[2];
+    }
+    if (Object.keys(parsed).length === 0) { showToast('未识别到有效变量'); return; }
+
+    // Reset form first
+    resetForm();
+
+    // Apply parsed values to protocol checkboxes and ports
+    protoKeys.forEach(k => {
+      if (parsed[k] !== undefined) {
+        const ck = document.querySelector('[data-proto="' + k + '"]');
+        const pt = document.querySelector('[data-port="' + k + '"]');
+        if (ck) ck.checked = true;
+        if (pt) pt.value = parsed[k];
+      }
+    });
+
+    // Enable dynamic inputs based on checked protocols
+    updateDynamicInputs();
+
+    // Handle argo first (may enable agn/agk/cfip)
+    if (parsed.argo) {
+      argoSelect.value = parsed.argo;
+      updateArgoState(parsed.argo);
+      if (parsed.argo === 'vwpt') vlessWsVCheckbox.checked = true;
+      if (parsed.argo === 'vmpt') vmessWsCheckbox.checked = true;
+    }
+
+    // Handle sub (enables subid/subpt)
+    if (parsed.sub) {
+      sub.value = parsed.sub;
+      updateSubState();
+    }
+
+    // Apply to option fields (after dynamic inputs are enabled)
+    optIds.forEach(id => {
+      if (parsed[id] !== undefined) {
+        const el = document.getElementById(id);
+        if (el) el.value = parsed[id];
+      }
+    });
+
+    // Handle argo related fields
+    if (parsed.agn) agn.value = parsed.agn;
+    if (parsed.agk) agk.value = parsed.agk;
+    if (parsed.cfip) cfip.value = parsed.cfip;
+
+    // Handle sub related fields
+    if (parsed.subid) subid.value = parsed.subid;
+    if (parsed.subpt) subpt.value = parsed.subpt;
+
+    // Handle oap
+    if (parsed.oap) oapSelect.value = parsed.oap;
+    render();
+    showToast('已恢复变量到表单');
+  }
+
+  document.getElementById('restore').addEventListener('click', restoreFromOutput);
 
   document.getElementById('copy').addEventListener('click', async () => {
     const t = document.getElementById('output');
